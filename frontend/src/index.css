@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+/* Charte AGRODIFA : fond blanc, bleu dominant, rouge en touches déco, vert pour "Bio".
+   Chaque couleur devient une classe : bg-brand-700, text-accent-600, etc. */
+@theme {
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+
+  --color-accent-50: #fef2f2;
+  --color-accent-500: #ef4444;
+  --color-accent-600: #dc2626;
+  --color-accent-700: #b91c1c;
+
+  --color-leaf-100: #dcfce7;
+  --color-leaf-600: #16a34a;
+  --color-leaf-700: #15803d;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-slate-800 antialiased;
+  }
+}
