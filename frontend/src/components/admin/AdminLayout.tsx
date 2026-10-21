@@ -29,10 +29,15 @@ export default function AdminLayout() {
             </NavLink>
           ))}
           {isOwner && (
+          <>
+            <NavLink to="/admin/equipe" className={navClass}>
+              Équipe & accès
+            </NavLink>
             <NavLink to="/admin/parametres" className={navClass}>
               Paramètres
             </NavLink>
-          )}
+          </>
+        )}
         </nav>
       </aside>
 

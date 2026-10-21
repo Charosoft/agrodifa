@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import { env } from './config/env'
 import { errorHandler, notFound } from './middleware/errors'
 import { healthRouter } from './routes/health'
+import { usersRouter } from './routes/users'
 
 const app = express()
 
@@ -11,8 +12,10 @@ app.use(helmet()) // en-têtes de sécurité
 app.use(cors({ origin: env.corsOrigins })) // seuls nos sites peuvent appeler l'API
 app.use(express.json({ limit: '1mb' }))
 
+
 app.use('/api/health', healthRouter)
-// Prochaine étape : app.use('/api/employees', employeesRouter) ...
+app.use('/api/users', usersRouter)
+
 
 app.use(notFound)
 app.use(errorHandler)

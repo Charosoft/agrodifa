@@ -56,3 +56,13 @@ export interface Profile {
   role: AppRole
   is_active: boolean
 }
+
+// Un compte tel que renvoyé par GET /api/users
+export interface TeamUser {
+  id: string
+  full_name: string
+  email: string | null
+  role: AppRole
+  is_active: boolean
+  modules: AppModule[]
+}

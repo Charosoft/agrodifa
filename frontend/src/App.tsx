@@ -7,6 +7,7 @@ import ModulePlaceholder from './pages/admin/ModulePlaceholder'
 import SettingsPage from './pages/admin/SettingsPage'
 import HomePage from './pages/public/HomePage'
 import NotFoundPage from './pages/public/NotFoundPage'
+import TeamPage from './pages/admin/TeamPage'
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
 
           <Route element={<ProtectedRoute ownerOnly />}>
             <Route path="parametres" element={<SettingsPage />} />
+            <Route path="equipe" element={<TeamPage />} />
           </Route>
         </Route>
       </Route>
