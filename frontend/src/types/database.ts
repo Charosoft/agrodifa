@@ -45,3 +45,14 @@ export interface AppSettings {
   usd_rate: number // 1 USD = usd_rate CDF
   rate_updated_at: string
 }
+
+// ----- Utilisateurs et droits -----
+export type AppRole = 'owner' | 'employee'
+export type AppModule = 'stock' | 'sales' | 'staff' | 'accounting' | 'advertising'
+
+export interface Profile {
+  id: string
+  full_name: string
+  role: AppRole
+  is_active: boolean
+}
