@@ -50,3 +50,4 @@ npm run dev                    # http://localhost:4000/api/health
 - Le fichier `.env` / `.env.local` ne va **jamais** sur GitHub.
 - La clé `service_role` (secrète) reste **uniquement** dans le backend.
 - Tous les prix en base sont en **CDF** ; le dollar est calculé avec le taux du propriétaire.
+# agrodifa
