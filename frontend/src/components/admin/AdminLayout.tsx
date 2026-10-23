@@ -1,6 +1,8 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { ADMIN_MODULES } from '../../lib/modules'
+import { supabase } from '../../lib/supabase'
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `block whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${
@@ -9,6 +11,19 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 
 export default function AdminLayout() {
   const { profile, session, isOwner, hasModule, signOut } = useAuth()
+  const location = useLocation()
+  const canSeeSales = hasModule('sales')
+  const [pending, setPending] = useState(0) // commandes en attente
+
+  // Recompte à chaque changement de page
+  useEffect(() => {
+    if (!canSeeSales) return
+    supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => setPending(count ?? 0))
+  }, [canSeeSales, location.pathname])
 
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
@@ -26,18 +41,21 @@ export default function AdminLayout() {
           {ADMIN_MODULES.filter((m) => hasModule(m.module)).map((m) => (
             <NavLink key={m.module} to={m.path} className={navClass}>
               {m.label}
+              {m.module === 'sales' && pending > 0 && (
+                <span className="ml-2 rounded-full bg-accent-600 px-1.5 py-0.5 text-xs font-bold text-white">{pending}</span>
+              )}
             </NavLink>
           ))}
           {isOwner && (
-          <>
-            <NavLink to="/admin/equipe" className={navClass}>
-              Équipe & accès
-            </NavLink>
-            <NavLink to="/admin/parametres" className={navClass}>
-              Paramètres
-            </NavLink>
-          </>
-        )}
+            <>
+              <NavLink to="/admin/equipe" className={navClass}>
+                Équipe & accès
+              </NavLink>
+              <NavLink to="/admin/parametres" className={navClass}>
+                Paramètres
+              </NavLink>
+            </>
+          )}
         </nav>
       </aside>
 
