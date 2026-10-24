@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import AdvertForm from '../../components/adverts/AdvertForm'
+import ProductPicker from '../../components/adverts/ProductPicker'
 import { errMsg } from '../../lib/errors'
+import { PRODUCT_SELECT } from '../../lib/products'
 import { deleteProductImageFile } from '../../lib/storage'
 import { supabase } from '../../lib/supabase'
-import type { Advert, Category } from '../../types/database'
+import type { Advert, Category, ProductWithImages } from '../../types/database'
 
 export default function AdvertsPage() {
   const [adverts, setAdverts] = useState<Advert[]>([])
@@ -11,6 +14,10 @@ export default function AdvertsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<Advert | 'new' | null>(null)
+  const [picking, setPicking] = useState(false) // choix d'un produit en cours
+  const [fromProduct, setFromProduct] = useState<ProductWithImages | undefined>(undefined)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const productId = searchParams.get('produit') // lien « Promouvoir » depuis la page Produits
 
   const load = useCallback(async () => {
     const [ads, cats] = await Promise.all([
@@ -27,6 +34,26 @@ export default function AdvertsPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    if (!productId) return
+    supabase
+      .from('products')
+      .select(PRODUCT_SELECT)
+      .eq('id', productId)
+      .single()
+      .then(({ data, error }) => {
+        setSearchParams({}, { replace: true })
+        if (error || !data) return setError('Produit introuvable.')
+        setFromProduct(data as ProductWithImages)
+        setEditing('new')
+      })
+  }, [productId, setSearchParams])
+
+  function closeForm() {
+    setEditing(null)
+    setFromProduct(undefined)
+  }
 
   async function toggleActive(a: Advert) {
     const { error } = await supabase.from('adverts').update({ is_active: !a.is_active }).eq('id', a.id)
@@ -65,24 +92,42 @@ export default function AdvertsPage() {
           <h1 className="text-2xl font-bold text-brand-800">Publicité</h1>
           <p className="text-sm text-slate-600">Les images défilent sur l'accueil, dans l'ordre ci-dessous.</p>
         </div>
-        {editing === null && (
-          <button onClick={() => setEditing('new')} className="rounded-lg bg-brand-700 px-4 py-2 font-semibold text-white hover:bg-brand-800">
-            + Nouvelle publicité
-          </button>
+        {editing === null && !picking && (
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setPicking(true)} className="rounded-lg bg-brand-700 px-4 py-2 font-semibold text-white hover:bg-brand-800">
+              + À partir d'un produit
+            </button>
+            <button onClick={() => setEditing('new')} className="rounded-lg border border-brand-700 px-4 py-2 font-semibold text-brand-700 hover:bg-brand-50">
+              + Publicité libre
+            </button>
+          </div>
         )}
       </div>
 
       {error && <p className="rounded-lg bg-accent-50 px-3 py-2 text-sm text-accent-700">{error}</p>}
 
+      {picking && (
+        <ProductPicker
+          advertisedLinks={adverts.map((a) => a.link ?? '')}
+          onCancel={() => setPicking(false)}
+          onPick={(p) => {
+            setPicking(false)
+            setFromProduct(p)
+            setEditing('new')
+          }}
+        />
+      )}
+
       {editing !== null && (
         <AdvertForm
-          key={editing === 'new' ? 'new' : editing.id}
+          key={editing === 'new' ? `new-${fromProduct?.id ?? 'free'}` : editing.id}
           advert={editing === 'new' ? undefined : editing}
+          fromProduct={editing === 'new' ? fromProduct : undefined}
           categories={categories}
           nextPosition={nextPosition}
-          onCancel={() => setEditing(null)}
+          onCancel={closeForm}
           onDone={() => {
-            setEditing(null)
+            closeForm()
             load()
           }}
         />

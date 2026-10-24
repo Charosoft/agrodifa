@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import CategoryManager from '../../components/products/CategoryManager'
 import ProductForm from '../../components/products/ProductForm'
 import PriceTag from '../../components/ui/PriceTag'
+import { useAuth } from '../../hooks/useAuth'
 import { useUsdRate } from '../../hooks/useUsdRate'
 import { deleteProductImageFile } from '../../lib/storage'
 import { errMsg } from '../../lib/errors'
@@ -11,6 +13,7 @@ import StockPanel from '../../components/products/StockPanel'
 
 export default function ProductsPage() {
   const rate = useUsdRate()
+  const { hasModule } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [products, setProducts] = useState<ProductWithImages[]>([])
   const [loading, setLoading] = useState(true)
@@ -118,6 +121,9 @@ export default function ProductsPage() {
                 <button onClick={() => { setStockForId(p.id)
                  window.scrollTo({ top: 0, behavior: 'smooth' })}}
                 className="text-leaf-700 hover:text-leaf-600">Stock</button>
+                {hasModule('advertising') && p.is_active && (
+                  <Link to={`/admin/publicite?produit=${p.id}`} className="text-brand-700 hover:text-brand-900">Promouvoir</Link>
+                )}
                 <button onClick={() => setEditing(p)} className="text-brand-700 hover:text-brand-900">Modifier</button>
                 <button onClick={() => remove(p)} className="text-accent-600 hover:text-accent-700">Supprimer</button>
               </div>
