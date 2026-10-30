@@ -2,8 +2,8 @@
 // ⚠️ À REMPLACER par les vraies informations du client.
 export const SITE = {
   name: 'AGRODIFA',
-  phone: '+243 000 000 000',
-  whatsapp: '243000000000', // numéro WhatsApp sans le "+" ni espaces
+  phone: '+243 976 029 960',
+  whatsapp: '243976029960', // numéro WhatsApp sans le "+" ni espaces
   email: 'contact@agrodifa.com',
   address: 'Adresse à compléter',
 }
