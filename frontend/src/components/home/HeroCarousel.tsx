@@ -41,7 +41,7 @@ export default function HeroCarousel() {
   // Changement automatique toutes les 5 secondes (sauf si le visiteur survole)
   useEffect(() => {
     if (paused || slides.length < 2) return
-    const timer = setInterval(() => setIndex((i) => (i + 1) % slides.length), 5000)
+    const timer = setInterval(() => setIndex((i) => (i + 1) % slides.length), 2000)
     return () => clearInterval(timer)
   }, [paused, slides.length])
 
@@ -50,7 +50,7 @@ export default function HeroCarousel() {
 
   return (
     <section
-      className="relative h-72 overflow-hidden rounded-2xl bg-brand-800 sm:h-[26rem]"
+      className="relative h-72 overflow-hidden rounded-2xl bg-brand-800 sm:h-[31rem]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
