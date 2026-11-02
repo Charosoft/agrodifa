@@ -3,4 +3,4 @@ Allow: /
 Disallow: /admin
 
 # ⚠️ Remplacer par le vrai domaine
-Sitemap: https://agrodifa.vercel.app/sitemap.xml
+Sitemap: https://agrodifa.alwaysdata.net/sitemap.xml
