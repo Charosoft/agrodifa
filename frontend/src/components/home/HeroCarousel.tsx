@@ -38,10 +38,10 @@ export default function HeroCarousel() {
       })
   }, [])
 
-  // Changement automatique toutes les 5 secondes (sauf si le visiteur survole)
+  // Changement automatique toutes les 4 secondes (sauf si le visiteur survole)
   useEffect(() => {
     if (paused || slides.length < 2) return
-    const timer = setInterval(() => setIndex((i) => (i + 1) % slides.length), 2000)
+    const timer = setInterval(() => setIndex((i) => (i + 1) % slides.length), 4000)
     return () => clearInterval(timer)
   }, [paused, slides.length])
 
@@ -50,7 +50,7 @@ export default function HeroCarousel() {
 
   return (
     <section
-      className="relative h-72 overflow-hidden rounded-2xl bg-brand-800 sm:h-[31rem]"
+      className="relative h-72 overflow-hidden rounded-2xl bg-brand-800 sm:h-[26rem]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
