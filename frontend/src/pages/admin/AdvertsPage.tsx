@@ -146,7 +146,10 @@ export default function AdvertsPage() {
             <img src={a.image_url} alt={a.title} className="h-20 w-36 rounded-lg object-cover" />
 
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-slate-800">{a.title}</p>
+              <p className="font-semibold text-slate-800">
+                {a.title}
+                {a.video_url && <span className="ml-2 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-800">▶ Vidéo</span>}
+              </p>
               {a.subtitle && <p className="text-sm text-slate-500">{a.subtitle}</p>}
               <p className="text-xs text-slate-400">Lien : {a.link ?? '—'}</p>
               <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${a.is_active ? 'bg-leaf-100 text-leaf-700' : 'bg-slate-200 text-slate-600'}`}>

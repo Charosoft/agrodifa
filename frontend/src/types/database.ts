@@ -36,6 +36,7 @@ export interface Advert {
   title: string
   subtitle: string | null
   image_url: string
+  video_url: string | null
   link: string | null
   position: number
   is_active: boolean

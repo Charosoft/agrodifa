@@ -61,8 +61,9 @@ export default function HomePage() {
   }, [])
 
   return (
-    <main className="mx-auto max-w-6xl space-y-16 px-4 py-6">
-      <HeroCarousel />
+    <>
+    <HeroCarousel />
+    <main className="mx-auto max-w-6xl space-y-16 px-4 py-12">
 
       {/* Points forts */}
       <section className="grid gap-4 sm:grid-cols-3">
@@ -151,5 +152,6 @@ export default function HomePage() {
         </div>
       </section>
     </main>
+    </>
   )
 }

@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 
 const BUCKET = 'product-images'
+const MAX_VIDEO = 40 * 1024 * 1024 // l'offre gratuite de Supabase accepte environ 50 Mo par fichier
 
 // Réduit l'image avant l'envoi : plus rapide et moins de données pour tout le monde.
 async function compressImage(file: File, maxSize: number, quality: number): Promise<Blob> {
@@ -36,9 +37,53 @@ export function uploadProductImage(productId: string, file: File): Promise<strin
   return uploadImage(`products/${productId}/${crypto.randomUUID()}.jpg`, file, 1200, 0.82)
 }
 
-// Image de publicité pour le carrousel (1800 px max, un peu plus soignée)
+// Image de publicité pour le carrousel plein écran (2000 px max)
 export function uploadAdvertImage(file: File): Promise<string> {
-  return uploadImage(`adverts/${crypto.randomUUID()}.jpg`, file, 1800, 0.85)
+  return uploadImage(`adverts/${crypto.randomUUID()}.jpg`, file, 2000, 0.85)
+}
+
+// Vidéo de publicité (MP4 ou WebM), envoyée telle quelle
+export async function uploadAdvertVideo(file: File): Promise<string> {
+  if (!file.type.startsWith('video/')) throw new Error(`"${file.name}" n'est pas une vidéo`)
+  if (file.size > MAX_VIDEO) throw new Error(`"${file.name}" dépasse 40 Mo : compressez la vidéo avant de l'envoyer`)
+
+  const ext = file.type === 'video/webm' ? 'webm' : 'mp4'
+  const path = `adverts/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type })
+  if (error) throw new Error(error.message)
+
+  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+}
+
+// Extrait une image de la vidéo (utilisée comme couverture pendant le chargement)
+export function captureVideoFrame(file: File): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const video = document.createElement('video')
+    const finish = (fn: () => void) => {
+      URL.revokeObjectURL(url)
+      fn()
+    }
+    video.muted = true
+    video.playsInline = true
+    video.preload = 'auto'
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(0.5, (video.duration || 1) / 2)
+    }
+    video.onseeked = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      canvas.getContext('2d')!.drawImage(video, 0, 0)
+      canvas.toBlob(
+        (b) => finish(() => (b ? resolve(new File([b], 'couverture.jpg', { type: 'image/jpeg' })) : reject(new Error('Image de la vidéo impossible')))),
+        'image/jpeg',
+        0.85,
+      )
+    }
+    video.onerror = () => finish(() => reject(new Error('Lecture de la vidéo impossible : essayez un fichier MP4 ou WebM')))
+    video.src = url
+  })
 }
 
 // Supprime un fichier du stockage à partir de son adresse publique (produits ou publicités).
