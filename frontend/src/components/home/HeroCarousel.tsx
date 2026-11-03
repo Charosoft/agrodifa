@@ -64,13 +64,20 @@ export default function HeroCarousel() {
     >
       <h1 className="sr-only">AGRODIFA : produits agro-pastoraux bio</h1>
 
-      {slides.map((s, i) => (
+      {slides.map((s, i) => {
+        // Seules la slide affichée, la précédente et la suivante chargent leur image
+        const near = i === current || i === (current + 1) % count || i === (current - 1 + count) % count
+        return (
         <div
           key={s.id}
           className={`absolute inset-0 transition-opacity duration-700 ${i === current ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           {s.image_url ? (
-            <img src={s.image_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            near ? (
+              <img src={s.image_url} alt="" fetchPriority={i === 0 ? 'high' : 'auto'} className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 bg-brand-900" />
+            )
           ) : (
             <div className="absolute inset-0 bg-linear-to-br from-brand-900 to-brand-600">
               <div className="absolute -right-16 -top-16 h-72 w-72 rounded-full bg-accent-600/70" />
@@ -111,7 +118,8 @@ export default function HeroCarousel() {
             </div>
           </div>
         </div>
-      ))}
+        )
+      })}
 
       {count > 1 && (
         <>
