@@ -54,6 +54,9 @@ export default function AdminLayout() {
               <NavLink to="/admin/parametres" className={navClass}>
                 Paramètres
               </NavLink>
+              <NavLink to="/admin/journal" className={navClass}>
+                Journal d'audit
+              </NavLink>
             </>
           )}
         </nav>

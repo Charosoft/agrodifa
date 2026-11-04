@@ -22,12 +22,12 @@ export default function PaymentHistory({ employee, onClose, onChanged }: Props) 
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from('employee_payments')
-      .select('*')
+      .select('*, profiles(full_name)')
       .eq('employee_id', employee.id)
       .order('paid_at', { ascending: false })
       .limit(100)
     if (error) setError(errMsg(error))
-    setRows((data as EmployeePayment[]) ?? [])
+    setRows((data as unknown as EmployeePayment[]) ?? [])
     setLoading(false)
   }, [employee.id])
 
@@ -36,7 +36,7 @@ export default function PaymentHistory({ employee, onClose, onChanged }: Props) 
   }, [load])
 
   async function remove(p: EmployeePayment) {
-    if (!window.confirm(`Supprimer ce paiement de ${formatCDF(p.amount)} ? La dépense liée en comptabilité sera aussi supprimée.`)) return
+    if (!window.confirm(`Supprimer ce paiement de ${formatCDF(p.amount)} ? La dépense liée en comptabilité sera aussi supprimée. La suppression reste visible dans le journal d'audit.`)) return
     const { error } = await supabase.from('employee_payments').delete().eq('id', p.id)
     if (error) return setError(errMsg(error))
     load()
@@ -65,6 +65,7 @@ export default function PaymentHistory({ employee, onClose, onChanged }: Props) 
                 {PAY_LABELS[p.method]} · payé le {new Date(p.paid_at).toLocaleDateString('fr-FR')}
                 {p.note ? ` · ${p.note}` : ''}
               </p>
+              <p className="text-xs text-slate-500">Enregistré par {p.profiles?.full_name || (p.created_by ? 'Utilisateur' : 'Système')}</p>
             </div>
             {isOwner && (
               <button onClick={() => remove(p)} className="font-semibold text-accent-600 hover:text-accent-700">

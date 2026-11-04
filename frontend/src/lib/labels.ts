@@ -27,4 +27,5 @@ export const KIND_LABELS: Record<PaymentKind, string> = {
   salary: 'Salaire',
   advance: 'Avance',
   bonus: 'Prime',
+    transport: 'Transport',
 }

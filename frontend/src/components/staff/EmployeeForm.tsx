@@ -15,7 +15,9 @@ export default function EmployeeForm({ employee, onCancel, onDone }: Props) {
   const [fullName, setFullName] = useState(employee?.full_name ?? '')
   const [jobTitle, setJobTitle] = useState(employee?.job_title ?? '')
   const [phone, setPhone] = useState(employee?.phone ?? '')
+  const [address, setAddress] = useState(employee?.address ?? '')
   const [salary, setSalary] = useState(String(employee?.base_salary ?? ''))
+  const [transport, setTransport] = useState(String(employee?.transport_fee ?? ''))
   const [hireDate, setHireDate] = useState(employee?.hire_date ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -24,14 +26,18 @@ export default function EmployeeForm({ employee, onCancel, onDone }: Props) {
     e.preventDefault()
     setError(null)
     const base = Number(salary || 0)
+    const fee = Number(transport || 0)
     if (!fullName.trim()) return setError('Le nom est obligatoire.')
     if (!Number.isFinite(base) || base < 0) return setError('Salaire invalide.')
+    if (!Number.isFinite(fee) || fee < 0) return setError('Frais de transport invalides.')
 
     const row = {
       full_name: fullName.trim(),
       job_title: jobTitle.trim() || null,
       phone: phone.trim() || null,
+      address: address.trim() || null,
       base_salary: base,
+      transport_fee: fee,
       hire_date: hireDate || null,
     }
     setSaving(true)
@@ -62,12 +68,26 @@ export default function EmployeeForm({ employee, onCancel, onDone }: Props) {
           <input value={phone} onChange={(e) => setPhone(e.target.value)} className={input} />
         </label>
         <label className="block text-sm font-medium text-slate-700">
+          Date d'embauche
+          <input type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} className={input} />
+        </label>
+        <label className="block text-sm font-medium text-slate-700 sm:col-span-2">
+          Adresse complète
+          <input
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Avenue, numéro, quartier, commune, ville"
+            className={input}
+          />
+        </label>
+        <label className="block text-sm font-medium text-slate-700">
           Salaire mensuel (FC)
           <input type="number" min="0" step="1" value={salary} onChange={(e) => setSalary(e.target.value)} className={input} />
         </label>
         <label className="block text-sm font-medium text-slate-700">
-          Date d'embauche
-          <input type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} className={input} />
+          Frais de transport habituel (FC)
+          <input type="number" min="0" step="1" value={transport} onChange={(e) => setTransport(e.target.value)} className={input} />
+          <span className="mt-1 block text-xs text-slate-500">Selon la distance du domicile. Proposé automatiquement lors du paiement, modifiable.</span>
         </label>
       </div>
 

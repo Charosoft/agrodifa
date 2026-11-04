@@ -21,20 +21,23 @@ export default function StaffPage() {
   const rate = useUsdRate()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [payments, setPayments] = useState<EmployeePayment[]>([])
+  const [paidIds, setPaidIds] = useState<Set<string>>(new Set()) // salaires déjà payés ce mois-ci
   const [month, setMonth] = useState(currentMonth())
   const [mode, setMode] = useState<Mode>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [emps, pays] = await Promise.all([
+    const [emps, pays, paid] = await Promise.all([
       supabase.from('employees').select('*').order('is_active', { ascending: false }).order('full_name'),
       supabase.from('employee_payments').select('*').eq('period', month),
+      supabase.rpc('salary_paid_ids', { p_period: month }),
     ])
-    const err = emps.error ?? pays.error
+    const err = emps.error ?? pays.error ?? paid.error
     setError(err ? errMsg(err) : null)
     setEmployees((emps.data as Employee[]) ?? [])
     setPayments((pays.data as EmployeePayment[]) ?? [])
+    setPaidIds(new Set((paid.data as string[] | null) ?? []))
     setLoading(false)
   }, [month])
 
@@ -55,8 +58,8 @@ export default function StaffPage() {
     load()
   }
 
-  const paidFor = (id: string, kind?: 'salary') =>
-    payments.filter((p) => p.employee_id === id && (!kind || p.kind === kind)).reduce((s, p) => s + p.amount, 0)
+  const paidFor = (id: string, kindIsSalary: boolean) =>
+    payments.filter((p) => p.employee_id === id && (p.kind === 'salary') === kindIsSalary).reduce((s, p) => s + p.amount, 0)
 
   const monthTotal = payments.reduce((s, p) => s + p.amount, 0)
 
@@ -65,7 +68,7 @@ export default function StaffPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-brand-800">Personnel</h1>
-          <p className="text-sm text-slate-600">Employés, salaires, avances et primes.</p>
+          <p className="text-sm text-slate-600">Employés, salaires, avances, primes et frais de transport.</p>
         </div>
         {mode === null && (
           <button onClick={() => setMode({ type: 'edit' })} className="rounded-lg bg-brand-700 px-4 py-2 font-semibold text-white hover:bg-brand-800">
@@ -115,6 +118,7 @@ export default function StaffPage() {
         </label>
         <p className="text-sm text-slate-600">
           Payé en {monthLabel(month)} : <strong className="text-brand-800">{formatCDF(monthTotal)}</strong>
+          {!isOwner && <span className="text-xs text-slate-500"> (vos paiements)</span>}
         </p>
       </div>
 
@@ -127,12 +131,11 @@ export default function StaffPage() {
         )}
 
         {employees.map((e) => {
-          const salaryPaid = paidFor(e.id, 'salary')
-          const rest = e.base_salary - salaryPaid
-          let badge = { text: 'Salaire non payé', cls: 'bg-accent-50 text-accent-700' }
-          if (e.base_salary > 0 && rest <= 0) badge = { text: 'Salaire payé ✓', cls: 'bg-leaf-100 text-leaf-700' }
-          else if (salaryPaid > 0) badge = { text: `Reste ${formatCDF(rest)}`, cls: 'bg-amber-100 text-amber-800' }
-          const other = paidFor(e.id) - salaryPaid
+          const salaryPaid = paidIds.has(e.id)
+          const other = paidFor(e.id, false)
+          const badge = salaryPaid
+            ? { text: `Salaire de ${monthLabel(month)} payé ✓`, cls: 'bg-leaf-100 text-leaf-700' }
+            : { text: 'Salaire non payé', cls: 'bg-accent-50 text-accent-700' }
 
           return (
             <div key={e.id} className={`rounded-xl border border-slate-200 bg-white p-4 ${e.is_active ? '' : 'opacity-60'}`}>
@@ -142,17 +145,17 @@ export default function StaffPage() {
                     {e.full_name}
                     {!e.is_active && <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600">Inactif</span>}
                   </p>
-                  <p className="text-sm text-slate-500">
-                    {[e.job_title, e.phone].filter(Boolean).join(' · ') || '—'}
-                  </p>
+                  <p className="text-sm text-slate-500">{[e.job_title, e.phone].filter(Boolean).join(' · ') || '—'}</p>
+                  <p className="text-sm text-slate-500">📍 {e.address || <span className="text-amber-700">Adresse non renseignée</span>}</p>
                   <p className="mt-1 text-sm text-slate-700">
                     Salaire : {formatCDF(e.base_salary)} <span className="text-xs text-slate-500">{formatUSD(e.base_salary, rate)}</span>
+                    {e.transport_fee > 0 && <span className="ml-3">Transport : {formatCDF(e.transport_fee)}</span>}
                   </p>
                 </div>
                 {e.is_active && (
                   <div className="text-right">
                     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${badge.cls}`}>{badge.text}</span>
-                    {other > 0 && <p className="mt-1 text-xs text-slate-500">Avances/primes : {formatCDF(other)}</p>}
+                    {other > 0 && <p className="mt-1 text-xs text-slate-500">Avances, primes, transport : {formatCDF(other)}</p>}
                   </div>
                 )}
               </div>

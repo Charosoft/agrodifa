@@ -1,16 +1,20 @@
-import { useState } from 'react'
-import { CATEGORIES } from '../../lib/accounting'
+import { useEffect, useState } from 'react'
+import { CATEGORIES, STAFF_MOTIFS, friendlyPaymentError } from '../../lib/accounting'
 import { errMsg } from '../../lib/errors'
 import { formatCDF } from '../../lib/format'
-import { PAY_LABELS } from '../../lib/labels'
+import { KIND_LABELS, PAY_LABELS } from '../../lib/labels'
+import { currentMonth, monthLabel } from '../../lib/period'
 import { supabase } from '../../lib/supabase'
-import type { PayMethod, TxType } from '../../types/database'
+import type { Employee, PayMethod, PaymentKind, TxType } from '../../types/database'
+
+type Person = Pick<Employee, 'id' | 'full_name' | 'base_salary' | 'transport_fee'>
 
 interface Props {
   onCancel: () => void
   onDone: () => void
 }
 
+const OTHER = '__other'
 const input = 'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-brand-600 focus:outline-none'
 
 function today(): string {
@@ -18,19 +22,73 @@ function today(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Montant proposé automatiquement selon le motif et la personne (toujours modifiable)
+function suggestedAmount(kind: PaymentKind | undefined, p: Person | undefined): string {
+  if (!kind || !p) return ''
+  const v = kind === 'salary' ? p.base_salary : kind === 'transport' ? p.transport_fee : 0
+  return v > 0 ? String(v) : ''
+}
+
 export default function TransactionForm({ onCancel, onDone }: Props) {
   const [type, setType] = useState<TxType>('expense')
   const [category, setCategory] = useState(CATEGORIES.expense[0].value)
+  const [people, setPeople] = useState<Person[]>([])
+  const [who, setWho] = useState('') // id d'un employé, OTHER, ou vide
+  const [otherName, setOtherName] = useState('')
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<PayMethod>('cash')
   const [date, setDate] = useState(today())
+  const [period, setPeriod] = useState(currentMonth())
   const [description, setDescription] = useState('')
+  const [paidIds, setPaidIds] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const staffKind = type === 'expense' ? STAFF_MOTIFS[category] : undefined
+  const person = people.find((p) => p.id === who)
+  const salaryBlocked = staffKind === 'salary' && person !== undefined && paidIds.has(person.id)
+
+  // Liste du personnel actif, pour choisir le bénéficiaire
+  useEffect(() => {
+    supabase
+      .from('employees')
+      .select('id, full_name, base_salary, transport_fee')
+      .eq('is_active', true)
+      .order('full_name')
+      .then(({ data }) => setPeople((data as Person[]) ?? []))
+  }, [])
+
+  // Quels salaires sont déjà payés pour ce mois ?
+  useEffect(() => {
+    if (staffKind !== 'salary') return
+    let cancelled = false
+    supabase.rpc('salary_paid_ids', { p_period: period }).then(({ data }) => {
+      if (!cancelled) setPaidIds(new Set((data as string[] | null) ?? []))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [staffKind, period])
 
   function changeType(t: TxType) {
     setType(t)
     setCategory(CATEGORIES[t][0].value)
+    setWho('')
+    setAmount('')
+  }
+
+  function changeCategory(c: string) {
+    setCategory(c)
+    const kind = STAFF_MOTIFS[c]
+    if (kind) {
+      if (who === OTHER) setWho('')
+      if (person) setAmount(suggestedAmount(kind, person))
+    }
+  }
+
+  function changePerson(id: string) {
+    setWho(id)
+    if (staffKind) setAmount(suggestedAmount(staffKind, people.find((p) => p.id === id)))
   }
 
   async function submit(e: React.FormEvent) {
@@ -39,21 +97,57 @@ export default function TransactionForm({ onCancel, onDone }: Props) {
     const n = Number(amount)
     if (!Number.isFinite(n) || n <= 0) return setError('Entrez un montant supérieur à 0.')
     if (!date) return setError('Choisissez la date.')
-    if (!description.trim()) return setError('Ajoutez une description (ex : « Sac de maïs au marché »).')
-    const label = type === 'income' ? 'cette entrée' : 'cette dépense'
-    if (!window.confirm(`Enregistrer ${label} de ${formatCDF(n)} ? Elle ne pourra être supprimée que par le propriétaire.`)) return
+
+    let beneficiaryName = ''
+    if (type === 'expense') {
+      if (!who) return setError('Choisissez le bénéficiaire : qui reçoit cet argent ?')
+      if (who === OTHER) {
+        beneficiaryName = otherName.trim()
+        if (!beneficiaryName) return setError('Écrivez le nom du bénéficiaire.')
+      } else {
+        beneficiaryName = person?.full_name ?? ''
+      }
+    }
+    if (staffKind && !period) return setError('Choisissez le mois concerné.')
+    if (salaryBlocked) return setError(`Le salaire de ${monthLabel(period)} est déjà payé pour ${person?.full_name}.`)
+    if (!staffKind && !description.trim()) return setError('Ajoutez une description (ex : « Sac de maïs au marché »).')
+
+    const what = staffKind ? KIND_LABELS[staffKind].toLowerCase() : type === 'income' ? 'cette entrée' : 'cette dépense'
+    const to = beneficiaryName ? ` pour ${beneficiaryName}` : ''
+    if (!window.confirm(`Enregistrer ${what} de ${formatCDF(n)}${to} ? Elle ne pourra être supprimée que par le propriétaire.`)) return
 
     setSaving(true)
-    const { error } = await supabase.from('transactions').insert({
-      type,
-      category,
-      amount: n,
-      method,
-      description: description.trim(),
-      occurred_at: new Date(`${date}T12:00:00`).toISOString(),
-    })
+    const paidAt = new Date(`${date}T12:00:00`).toISOString()
+    let failure: unknown = null
+
+    if (staffKind && person) {
+      // Paiement du personnel : la dépense en comptabilité est créée automatiquement avec le bénéficiaire
+      const { error } = await supabase.from('employee_payments').insert({
+        employee_id: person.id,
+        kind: staffKind,
+        amount: n,
+        method,
+        period,
+        note: description.trim() || null,
+        paid_at: paidAt,
+      })
+      if (error) failure = friendlyPaymentError(error, person.full_name, period)
+    } else {
+      const { error } = await supabase.from('transactions').insert({
+        type,
+        category,
+        amount: n,
+        method,
+        description: description.trim(),
+        occurred_at: paidAt,
+        beneficiary_employee_id: person?.id ?? null,
+        beneficiary_name: beneficiaryName || null,
+      })
+      if (error) failure = errMsg(error)
+    }
+
     setSaving(false)
-    if (error) return setError(errMsg(error))
+    if (failure) return setError(String(failure))
     onDone()
   }
 
@@ -83,17 +177,46 @@ export default function TransactionForm({ onCancel, onDone }: Props) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-medium text-slate-700">
-          Catégorie
-          <select value={category} onChange={(e) => setCategory(e.target.value)} className={input}>
+          Motif
+          <select value={category} onChange={(e) => changeCategory(e.target.value)} className={input}>
             {CATEGORIES[type].map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
         </label>
+
+        {type === 'expense' && (
+          <label className="block text-sm font-medium text-slate-700">
+            Bénéficiaire *
+            <select value={who} onChange={(e) => changePerson(e.target.value)} className={input}>
+              <option value="">— Choisir —</option>
+              <optgroup label="Personnel">
+                {people.map((p) => (
+                  <option key={p.id} value={p.id}>{p.full_name}</option>
+                ))}
+              </optgroup>
+              {!staffKind && <option value={OTHER}>Autre (fournisseur, tiers…)</option>}
+            </select>
+          </label>
+        )}
+
+        {who === OTHER && !staffKind && (
+          <label className="block text-sm font-medium text-slate-700 sm:col-span-2">
+            Nom du bénéficiaire *
+            <input value={otherName} onChange={(e) => setOtherName(e.target.value)} placeholder="Ex : Fournisseur Kabamba" className={input} />
+          </label>
+        )}
+
         <label className="block text-sm font-medium text-slate-700">
           Montant (FC)
           <input type="number" min="1" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} className={input} />
+          {staffKind && person && suggestedAmount(staffKind, person) && (
+            <span className="mt-1 block text-xs text-slate-500">
+              Montant habituel de {person.full_name} : {formatCDF(Number(suggestedAmount(staffKind, person)))} (modifiable)
+            </span>
+          )}
         </label>
+
         <label className="block text-sm font-medium text-slate-700">
           Moyen de paiement
           <select value={method} onChange={(e) => setMethod(e.target.value as PayMethod)} className={input}>
@@ -102,19 +225,39 @@ export default function TransactionForm({ onCancel, onDone }: Props) {
             ))}
           </select>
         </label>
+
         <label className="block text-sm font-medium text-slate-700">
           Date
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={input} />
         </label>
+
+        {staffKind && (
+          <label className="block text-sm font-medium text-slate-700">
+            Mois concerné
+            <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} className={input} />
+          </label>
+        )}
       </div>
 
+      {salaryBlocked && (
+        <p role="alert" className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+          Le salaire de {monthLabel(period)} est déjà payé pour {person?.full_name}. Il ne peut pas être enregistré une deuxième fois.
+        </p>
+      )}
+
       <label className="block text-sm font-medium text-slate-700">
-        Description *
+        {staffKind ? 'Note (facultatif)' : 'Description *'}
         <input value={description} onChange={(e) => setDescription(e.target.value)} className={input} />
       </label>
 
+      {staffKind && (
+        <p className="text-xs text-slate-500">
+          Ce paiement apparaît aussi dans la fiche de l'employé (Personnel), avec son historique.
+        </p>
+      )}
+
       <div className="flex gap-3">
-        <button disabled={saving} className="rounded-lg bg-brand-700 px-4 py-2 font-semibold text-white hover:bg-brand-800 disabled:opacity-60">
+        <button disabled={saving || salaryBlocked} className="rounded-lg bg-brand-700 px-4 py-2 font-semibold text-white hover:bg-brand-800 disabled:opacity-60">
           {saving ? 'Enregistrement…' : 'Enregistrer'}
         </button>
         <button type="button" onClick={onCancel} className="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700">

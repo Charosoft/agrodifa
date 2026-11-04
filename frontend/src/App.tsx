@@ -9,6 +9,7 @@ const AdminLayout = lazy(() => import('./components/admin/AdminLayout'))
 const DashboardPage = lazy(() => import('./pages/admin/DashboardPage'))
 const LoginPage = lazy(() => import('./pages/admin/LoginPage'))
 const AdvertsPage = lazy(() => import('./pages/admin/AdvertsPage'))
+const AuditPage = lazy(() => import('./pages/admin/AuditPage'))
 const AccountingPage = lazy(() => import('./pages/admin/AccountingPage'))
 const OrdersPage = lazy(() => import('./pages/admin/OrdersPage'))
 const ProductsPage = lazy(() => import('./pages/admin/ProductsPage'))
@@ -72,6 +73,7 @@ export default function App() {
           <Route element={<ProtectedRoute ownerOnly />}>
             <Route path="parametres" element={page(SettingsPage)} />
             <Route path="equipe" element={page(TeamPage)} />
+            <Route path="journal" element={page(AuditPage)} />
           </Route>
         </Route>
       </Route>

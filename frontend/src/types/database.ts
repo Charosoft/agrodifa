@@ -124,7 +124,7 @@ export interface DashboardStats {
   top_products: { name: string; quantity: number; revenue: number }[]
 }
 
-export type PaymentKind = 'salary' | 'advance' | 'bonus'
+export type PaymentKind = 'salary' | 'advance' | 'bonus' | 'transport'
 
 export interface Employee {
   id: string
@@ -132,7 +132,9 @@ export interface Employee {
   full_name: string
   phone: string | null
   job_title: string | null
+  address: string | null
   base_salary: number
+  transport_fee: number
   hire_date: string | null
   is_active: boolean
   created_at: string
@@ -148,6 +150,7 @@ export interface EmployeePayment {
   note: string | null
   paid_at: string
   created_by: string | null
+  profiles?: { full_name: string } | null
 }
 
 export type TxType = 'income' | 'expense'
@@ -161,7 +164,21 @@ export interface Transaction {
   description: string | null
   order_id: string | null
   employee_payment_id: string | null
+  beneficiary_employee_id: string | null
+  beneficiary_name: string | null
   occurred_at: string
+  created_at: string
   created_by: string | null
   profiles: { full_name: string } | null
+}
+
+export interface AuditEntry {
+  id: number
+  at: string
+  actor_id: string | null
+  actor_name: string | null
+  action: 'create' | 'update' | 'delete'
+  table_name: string
+  record_id: string | null
+  summary: string
 }
