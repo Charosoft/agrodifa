@@ -34,6 +34,7 @@ export default function ContactPage() {
     setSending(false)
     if (error) return setError(errMsg(error))
     setSent(true)
+  
   }
 
   const whatsappUrl = `https://wa.me/${SITE.whatsapp}?text=${encodeURIComponent('Bonjour AGRODIFA, ')}`
