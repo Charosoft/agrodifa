@@ -37,7 +37,7 @@ export default function AccountingPage() {
     const { data, error } = await supabase
       .from('transactions')
       .select(
-        'id, type, amount, category, method, description, order_id, employee_payment_id, beneficiary_employee_id, beneficiary_name, occurred_at, created_at, created_by, profiles(full_name)',
+        'id, type, amount, category, method, description, order_id, employee_payment_id, beneficiary_employee_id, beneficiary_name, currency, original_amount, rate_used, occurred_at, created_at, created_by, profiles(full_name)',
       )
       .gte('occurred_at', from)
       .lt('occurred_at', to)
@@ -117,6 +117,12 @@ export default function AccountingPage() {
           }}
         />
       )}
+
+      <p className="text-sm text-slate-600">
+        Taux du dollar : <strong className="text-brand-800">1 $ = {rate.toLocaleString('fr-FR')} FC</strong>
+        {isOwner && <span className="text-xs text-slate-500"> (modifiable dans Paramètres)</span>}
+        <span className="block text-xs text-slate-500">Toute la comptabilité est comptée en FC. Une opération payée en dollars garde le taux du jour où elle a été enregistrée.</span>
+      </p>
 
       <label className="block text-sm font-medium text-slate-700">
         Mois :{' '}
@@ -210,6 +216,11 @@ export default function AccountingPage() {
                       ) : (
                         <span className="font-semibold text-amber-700">{NO_BENEFICIARY}</span>
                       )}
+                    </p>
+                  )}
+                  {t.currency === 'USD' && t.original_amount !== null && (
+                    <p className="text-xs font-semibold text-brand-700">
+                      Payé en dollars : {t.original_amount.toLocaleString('fr-FR')} $ au taux de 1 $ = {(t.rate_used ?? 0).toLocaleString('fr-FR')} FC
                     </p>
                   )}
                   <p className="text-xs text-slate-500">

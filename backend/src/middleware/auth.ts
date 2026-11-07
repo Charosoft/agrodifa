@@ -30,3 +30,39 @@ export const requireOwner: RequestHandler = async (req, res, next) => {
     next(err)
   }
 }
+
+// Vérifie que l'appelant est connecté, actif, et propriétaire OU possède le module demandé
+// (même règle que celle des permissions de la base de données).
+export function requireModule(module: string): RequestHandler {
+  return async (req, res, next) => {
+    try {
+      const header = req.headers.authorization ?? ''
+      const token = header.startsWith('Bearer ') ? header.slice(7) : ''
+      if (!token) throw new HttpError(401, 'Non connecté')
+
+      const { data, error } = await supabaseAdmin.auth.getUser(token)
+      if (error || !data.user) throw new HttpError(401, 'Session invalide')
+
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('role, is_active')
+        .eq('id', data.user.id)
+        .single()
+      if (!profile || !profile.is_active) throw new HttpError(403, 'Compte indisponible')
+
+      if (profile.role !== 'owner') {
+        const { data: mods } = await supabaseAdmin
+          .from('user_modules')
+          .select('module')
+          .eq('user_id', data.user.id)
+          .eq('module', module)
+        if (!mods || mods.length === 0) throw new HttpError(403, "Vous n'avez pas accès à cette fonction")
+      }
+
+      res.locals.userId = data.user.id
+      next()
+    } catch (err) {
+      next(err)
+    }
+  }
+}

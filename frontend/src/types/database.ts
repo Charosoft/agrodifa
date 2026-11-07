@@ -166,6 +166,9 @@ export interface Transaction {
   employee_payment_id: string | null
   beneficiary_employee_id: string | null
   beneficiary_name: string | null
+  currency: 'CDF' | 'USD'
+  original_amount: number | null
+  rate_used: number | null
   occurred_at: string
   created_at: string
   created_by: string | null

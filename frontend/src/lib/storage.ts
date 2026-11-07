@@ -1,7 +1,9 @@
 import { supabase } from './supabase'
 
+// Les anciens fichiers sont dans ce "bucket" de Supabase ; les nouveaux sont sur notre serveur
 const BUCKET = 'product-images'
-const MAX_VIDEO = 40 * 1024 * 1024 // l'offre gratuite de Supabase accepte environ 50 Mo par fichier
+const MAX_VIDEO = 40 * 1024 * 1024 // limite de notre serveur de fichiers
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:4000'
 
 // Réduit l'image avant l'envoi : plus rapide et moins de données pour tout le monde.
 async function compressImage(file: File, maxSize: number, quality: number): Promise<Blob> {
@@ -20,39 +22,50 @@ async function compressImage(file: File, maxSize: number, quality: number): Prom
   )
 }
 
-// Vérifie, compresse et envoie une image ; renvoie son adresse publique.
-async function uploadImage(path: string, file: File, maxSize: number, quality: number): Promise<string> {
+// Vérifie une image et la réduit (JPEG)
+async function prepareImage(file: File, maxSize: number, quality: number): Promise<Blob> {
   if (!file.type.startsWith('image/')) throw new Error(`"${file.name}" n'est pas une image`)
   if (file.size > 15 * 1024 * 1024) throw new Error(`"${file.name}" est trop lourde (15 Mo maximum)`)
-
-  const blob = await compressImage(file, maxSize, quality)
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg' })
-  if (error) throw new Error(error.message)
-
-  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+  return compressImage(file, maxSize, quality)
 }
 
-// Photo d'un produit (1200 px max)
-export function uploadProductImage(productId: string, file: File): Promise<string> {
-  return uploadImage(`products/${productId}/${crypto.randomUUID()}.jpg`, file, 1200, 0.82)
+// ---------- Envoi vers NOTRE serveur (disque d'Alwaysdata) ----------
+
+async function serverRequest(path: string, init: RequestInit): Promise<Response> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new Error('Session expirée : reconnectez-vous')
+  try {
+    return await fetch(`${API_URL}${path}`, { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` } })
+  } catch {
+    throw new Error('Le serveur de fichiers est injoignable. Vérifiez la connexion et réessayez.')
+  }
+}
+
+async function uploadToServer(folder: 'adverts' | 'products', body: Blob, contentType: string): Promise<string> {
+  const res = await serverRequest(`/api/media/${folder}`, { method: 'POST', headers: { 'Content-Type': contentType }, body })
+  const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
+  if (!res.ok || !json.url) throw new Error(json.error ?? `Envoi impossible (erreur ${res.status})`)
+  return json.url
 }
 
 // Image de publicité pour le carrousel plein écran (2000 px max)
-export function uploadAdvertImage(file: File): Promise<string> {
-  return uploadImage(`adverts/${crypto.randomUUID()}.jpg`, file, 2000, 0.85)
+export async function uploadAdvertImage(file: File): Promise<string> {
+  const blob = await prepareImage(file, 2000, 0.85)
+  return uploadToServer('adverts', blob, 'image/jpeg')
 }
 
 // Vidéo de publicité (MP4 ou WebM), envoyée telle quelle
 export async function uploadAdvertVideo(file: File): Promise<string> {
   if (!file.type.startsWith('video/')) throw new Error(`"${file.name}" n'est pas une vidéo`)
   if (file.size > MAX_VIDEO) throw new Error(`"${file.name}" dépasse 40 Mo : compressez la vidéo avant de l'envoyer`)
+  return uploadToServer('adverts', file, file.type)
+}
 
-  const ext = file.type === 'video/webm' ? 'webm' : 'mp4'
-  const path = `adverts/${crypto.randomUUID()}.${ext}`
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type })
-  if (error) throw new Error(error.message)
-
-  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+// Photo de produit (1200 px max), envoyée sur notre serveur comme les publicités
+export async function uploadProductImage(_productId: string, file: File): Promise<string> {
+  const blob = await prepareImage(file, 1200, 0.82)
+  return uploadToServer('products', blob, 'image/jpeg')
 }
 
 // Extrait une image de la vidéo (utilisée comme couverture pendant le chargement)
@@ -86,8 +99,17 @@ export function captureVideoFrame(file: File): Promise<File> {
   })
 }
 
-// Supprime un fichier du stockage à partir de son adresse publique (produits ou publicités).
+// Supprime un fichier à partir de son adresse publique.
+// Les anciens fichiers sont chez Supabase, les nouveaux sur notre serveur : on reconnaît les deux.
 export async function deleteProductImageFile(url: string): Promise<void> {
-  const path = url.split(`/${BUCKET}/`)[1]
-  if (path) await supabase.storage.from(BUCKET).remove([path])
+  const supabasePath = url.split(`/${BUCKET}/`)[1]
+  if (supabasePath) {
+    await supabase.storage.from(BUCKET).remove([supabasePath])
+    return
+  }
+  const own = url.match(/\/media\/(adverts|products)\/([^/?#]+)$/)
+  if (own) {
+    // Si la suppression échoue, le fichier reste en place : sans gravité, on ne bloque pas l'utilisateur
+    await serverRequest(`/api/media/${own[1]}/${own[2]}`, { method: 'DELETE' }).catch(() => undefined)
+  }
 }

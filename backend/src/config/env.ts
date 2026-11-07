@@ -8,6 +8,9 @@ const schema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   CORS_ORIGINS: z.string().default(''),
+  // Photos et vidéos envoyées par le site : dossier sur le disque et adresse publique de ce dossier
+  MEDIA_DIR: z.string().default('./media'),
+  MEDIA_PUBLIC_URL: z.string().url().default('http://localhost:4000/media'),
 })
 
 const result = schema.safeParse(process.env)
@@ -23,4 +26,5 @@ if (!result.success) {
 export const env = {
   ...result.data,
   corsOrigins: result.data.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
+  mediaPublicUrl: result.data.MEDIA_PUBLIC_URL.replace(/\/+$/, ''), // sans « / » final
 }

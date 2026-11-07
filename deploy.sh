@@ -17,6 +17,9 @@ deploy_front() {
 
   echo "▶ Frontend : mise en ligne (échange des dossiers)…"
   ssh "$HOST" "mkdir -p ~/www/agrodifa && rm -rf ~/www/agrodifa_old && mv ~/www/agrodifa ~/www/agrodifa_old && mv ~/www/agrodifa_new ~/www/agrodifa"
+
+  echo "▶ Frontend : raccordement du dossier des photos et vidéos…"
+  ssh "$HOST" "mkdir -p ~/media/adverts ~/media/products && ln -sfn ~/media ~/www/agrodifa/media"
   echo "✅ Frontend en ligne : $SITE_URL   (Ctrl+Maj+R pour vider le cache)"
 }
 
